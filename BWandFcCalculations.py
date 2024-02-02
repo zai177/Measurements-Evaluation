@@ -223,7 +223,7 @@ class BWandFcCalculations():
         fpr2[0][1] -= f_c * TCf * (OTR_high - Ta)
         fpr2[0][0] -= f_c * TCf * (OTR_low - Ta)
         net = net.interpolate(rf.Frequency(fpr[0][0], fpr[0][1], net[str(fpr[0][0]) + '-' + str(fpr[0][1]) + 'Hz'].frequency.npoints))
-        return (all(i >= mpr[0][0] for i in net.s_db[:, 0, 0]))
+        return (all(i <= mpr[0][0] for i in net.s_db[:, 0, 0]))
 
 
     def checkS11compliance(self, net, sptfile):
@@ -240,7 +240,7 @@ class BWandFcCalculations():
         fpr2[0][1] -= f_c * TCf * (OTR_high - Ta)
         fpr2[0][0] -= f_c * TCf * (OTR_low - Ta)
         net = net.interpolate(rf.Frequency(fpr2[0][0], fpr2[0][1], net[str(fpr2[0][0]) + '-' + str(fpr2[0][1]) + 'Hz'].frequency.npoints))
-        return (all(i >= mpr[0][0] for i in net.s_db[:, 0, 0]))
+        return (all(i <= mpr[0][0] for i in net.s_db[:, 0, 0]))
 
     def checkS22compliance_withoutTemp(self, net, sptfile):
         mat = scipy.io.loadmat(sptfile)
@@ -256,7 +256,7 @@ class BWandFcCalculations():
         fpr2[0][1] -= f_c * TCf * (OTR_high - Ta)
         fpr2[0][0] -= f_c * TCf * (OTR_low - Ta)
         net = net.interpolate(rf.Frequency(fpr[0][0], fpr[0][1], net[str(fpr[0][0]) + '-' + str(fpr[0][1]) + 'Hz'].frequency.npoints))
-        return (all(i >= mpr[0][0] for i in net.s_db[:, 1, 1]))
+        return (all(i <= mpr[0][0] for i in net.s_db[:, 1, 1]))
 
 
     def checkS22compliance(self, net, sptfile):
@@ -273,7 +273,7 @@ class BWandFcCalculations():
         fpr2[0][1] -= f_c * TCf * (OTR_high - Ta)
         fpr2[0][0] -= f_c * TCf * (OTR_low - Ta)
         net = net.interpolate(rf.Frequency(fpr2[0][0], fpr2[0][1], net[str(fpr2[0][0]) + '-' + str(fpr2[0][1]) + 'Hz'].frequency.npoints))
-        return (all(i >= mpr[0][0] for i in net.s_db[:, 1, 1]))
+        return (all(i <= mpr[0][0] for i in net.s_db[:, 1, 1]))
 
 
 
