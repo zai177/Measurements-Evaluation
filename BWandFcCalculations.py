@@ -44,6 +44,9 @@ class BWandFcCalculations():
             net.s[i, 1, 0] = net.s[i,1,0]*maxima
         return (upperFrequencyThreshold-lowerFreqthreshold)/1e6, (upperFrequencyThreshold+lowerFreqthreshold)/2e6, 20*np.log10(maxima)
 
+    def minInsertionLoss(self, net):
+        return net.s_db[:, 1, 0].max()
+
     def calculate_RightLeft(self,net, threshold):
         net.interpolate_self(50 * net.f.size)
         left = range(len(net.f[:np.argmax(net.s_mag[:, 1, 0])]))
@@ -170,12 +173,43 @@ class BWandFcCalculations():
             return 0
         elif all(np.diff(freq)==np.diff(freq)[0]):
             freqRange = freq[len(freq)-1]-freq[0]
+
             return freqRange/1000000
         else:
             step = freq[1]-freq[0]
             for i in range(len(freq)):
                 if (freq[i+1]-freq[i]!= step):
                     return (freq[i]-freq[0])/1000000
+
+    def calculateS22Width(self,net, threshold):
+        RL = net.s_db[:,1,1]
+        freq = net.f[np.argwhere(RL<threshold)]
+        freq = np.array(freq).reshape(-1)
+        if (len(freq)==0):
+            return 0
+        elif all(np.diff(freq)==np.diff(freq)[0]):
+            freqRange = freq[len(freq)-1]-freq[0]
+            return freqRange/1000000
+        else:
+            step = freq[1]-freq[0]
+            for i in range(len(freq)):
+                if (freq[i+1]-freq[i]!= step):
+                    return (freq[i]-freq[0])/1000000
+
+    def calculatePassbandWidth(self, net, threshold):
+        RL = net.s_db[:, 0, 1]
+        freq = net.f[np.argwhere(RL > threshold)]
+        freq = np.array(freq).reshape(-1)
+        if (len(freq) == 0):
+            return 0
+        elif all(np.diff(freq) == np.diff(freq)[0]):
+            freqRange = freq[len(freq) - 1] - freq[0]
+            return freqRange / 1000000
+        else:
+            step = freq[1] - freq[0]
+            for i in range(len(freq)):
+                if (freq[i + 1] - freq[i] != step):
+                    return (freq[i] - freq[0]) / 1000000
 
     def CheckPBCompliance_withoutTemp(self, net, sptfile):
         mat = scipy.io.loadmat(sptfile)
@@ -209,6 +243,22 @@ class BWandFcCalculations():
         net = net.interpolate(rf.Frequency(fpt2[0][0],fpt2[0][1],net[str(fpt2[0][0])+'-'+str(fpt2[0][1])+'Hz'].frequency.npoints))
         return (all(i >= mpt[0][0] for i in net.s_db[:,0,1]))
 
+
+    def PassbandWidth(self, sptfile):
+        mat = scipy.io.loadmat(sptfile)
+        tkh = mat.get('tkh')[0]
+        TCf = tkh[0]
+        Ta = tkh[4]
+        OTR_high = tkh[3]
+        OTR_low = tkh[2]
+        f_c = mat.get('f_c')[0] * 1e6
+        fpt = mat.get('fpt') * 1e6  # insertion loss limits
+        mpt = mat.get('mpt')
+        fpt2 = copy.deepcopy(fpt)
+        fpt2[0][1] -= f_c * TCf * (OTR_high - Ta)
+        fpt2[0][0] -= f_c * TCf * (OTR_low - Ta)
+        return (fpt2[0][1]- fpt2[0][0])/1e6
+
     def checkS11compliance_withoutTemp(self, net, sptfile):
         mat = scipy.io.loadmat(sptfile)
         tkh = mat.get('tkh')[0]
@@ -223,7 +273,7 @@ class BWandFcCalculations():
         fpr2[0][1] -= f_c * TCf * (OTR_high - Ta)
         fpr2[0][0] -= f_c * TCf * (OTR_low - Ta)
         net = net.interpolate(rf.Frequency(fpr[0][0], fpr[0][1], net[str(fpr[0][0]) + '-' + str(fpr[0][1]) + 'Hz'].frequency.npoints))
-        return (all(i <= mpr[0][0] for i in net.s_db[:, 0, 0]))
+        return (all(i <= (mpr[0][0])for i in net.s_db[:, 0, 0]))
 
 
     def checkS11compliance(self, net, sptfile):
@@ -277,21 +327,6 @@ class BWandFcCalculations():
 
 
 
-    def calculatePassbandWidth(self, net, threshold):
-        RL = net.s_db[:, 0, 1]
-        freq = net.f[np.argwhere(RL > threshold)]
-        freq = np.array(freq).reshape(-1)
-        if (len(freq) == 0):
-            return 0
-        elif all(np.diff(freq) == np.diff(freq)[0]):
-            freqRange = freq[len(freq) - 1] - freq[0]
-            return freqRange / 1000000
-        else:
-            step = freq[1] - freq[0]
-            for i in range(len(freq)):
-                if (freq[i + 1] - freq[i] != step):
-                    return (freq[i] - freq[0]) / 1000000
-
     def add_RL_limit(self, ax, file):
         mat = scipy.io.loadmat(file)
         tkh = mat.get('tkh')[0]
@@ -303,8 +338,8 @@ class BWandFcCalculations():
         fpr = mat.get('fpr') * 1e6  # return loss limit for S11/s22
         mpr = mat.get('mpr')
         fpr2 = copy.deepcopy(fpr)
-        fpr2[0][1] -= f_c * TCf * (OTR_high - Ta)
-        fpr2[0][0] -= f_c * TCf * (OTR_low - Ta)
+        fpr2[0][1] -= fpr2[0][1] * TCf * (OTR_high - Ta)
+        fpr2[0][0] -= fpr2[0][0] * TCf * (OTR_low - Ta)
         line = mlines.Line2D(fpr2, mpr)
         line.set_color('green')
         line.set_linestyle('--')
@@ -334,24 +369,22 @@ class BWandFcCalculations():
         fpt = mat.get('fpt') * 1e6  # insertion loss limits
         mpt = mat.get('mpt')
         fpt2 = copy.deepcopy(fpt)
-        fpt2[0][1] -= f_c * TCf * (OTR_high - Ta)
-        fpt2[0][0] -= f_c * TCf * (OTR_low - Ta)
-
+        fpt2[0][1] -= fpt[0][1] * TCf * (OTR_high - Ta)
+        fpt2[0][0] -= fpt[0][0] * TCf * (OTR_low - Ta)
         fst = mat.get('fst') * 1e6  # Transfer limits S21
         mst = mat.get('mst')
-
         fst2 = copy.deepcopy(fst)
-        for j in range(len(fst2[0])):
+        for j in range(len(fst2[0])-1):
             if (fst[0][j] == fst[0][j - 1]):
-                fst2[0][j] = fst2[0][j - 1]
-            elif (fst2[0][j] > f_c or fst2[0][j] < 1220000000):
-                fst2[0][j] = fst2[0][j] - f_c * TCf * (OTR_low - Ta)
+                if(mst[0][j] > mst[0][j-1]):
+                    fst2[0][j] = fst2[0][j] - fst2[0][j] * TCf * (OTR_high - Ta)
+                else:
+                    fst2[0][j] = fst2[0][j] - fst2[0][j] * TCf * (OTR_low - Ta)
             else:
-                fst2[0][j] = fst2[0][j] - f_c * TCf * (OTR_high - Ta)
-
-                # else:
-                #     fst2[0][j] = fst2[0][j] - f_c * TCf * (OTR_low - Ta)
-                #     print(mst[0][j])
+                if (mst[0][j] < mst[0][j + 1]):
+                    fst2[0][j] = fst2[0][j] - fst2[0][j] * TCf * (OTR_high - Ta)
+                else:
+                    fst2[0][j] = fst2[0][j] - fst2[0][j] * TCf * (OTR_low - Ta)
         line = mlines.Line2D(fpt2, mpt)
         line.set_color('green')
         line.set_linestyle('--')
